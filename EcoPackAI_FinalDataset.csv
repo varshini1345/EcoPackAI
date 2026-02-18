@@ -1,0 +1,65 @@
+Material_ID,Material_Type,Strength,Weight_Capacity,Cost_Per_Unit_INR,Biodegradability_Score,Recyclability,CO2_Score
+M01,Hemp Fiber Board,1,8,280,10,88,2
+M02,Seaweed Packaging,2,16,120,9,85,2
+M03,Mycelium Foam,3,24,150,8,82,3
+M04,Palm Leaf Packaging,1,23,18,7,80,3
+M05,PHA Biopolymer,2,31,410,6,78,4
+M06,Wheat Straw Fiber,3,14,45,5,76,5
+M07,Rice Husk Composite,1,13,65,4,74,5
+M08,Ocean Recycled Plastic,2,21,110,3,72,6
+M09,Biodegradable PET,3,29,380,2,70,7
+M10,Refined Glass Fiber,1,28,450,10,68,2
+M11,Lightweight Aluminum,2,11,490,9,66,4
+M12,Banana Fiber Board,3,19,210,8,64,3
+M13,Corn Starch Polymer,1,18,55,7,62,4
+M14,Sugarcane Bagasse,2,26,35,6,60,4
+M15,Jute Fiber Panel,3,34,180,5,58,5
+M16,Coconut Husk Composite,1,8,50,4,56,6
+M17,Flax Fiber Sheet,2,16,320,3,54,7
+M18,Kenaf Fiber Board,3,24,260,2,52,8
+M19,Areca Leaf Plate,1,23,12,10,50,1
+M20,Water Hyacinth Fiber,2,31,85,9,48,2
+M21,Reed Fiber Board,3,14,140,8,46,3
+M22,Lotus Stem Fiber,1,13,420,7,44,4
+M23,Bamboo Pulp Board,2,21,95,6,42,4
+M24,Recycled Textile Fiber,3,29,130,5,40,5
+M25,Cotton Linter Board,1,28,175,4,38,6
+M26,Wood Pulp Composite,2,11,80,3,36,7
+M27,Miscanthus Fiber Board,3,19,230,2,34,8
+M28,Pineapple Leaf Fiber,1,18,310,10,32,2
+M29,Coffee Husk Composite,2,26,75,9,30,3
+M30,Tea Waste Fiber,3,34,65,8,28,3
+M31,Soy Protein Polymer,1,8,240,7,26,4
+M32,Potato Starch Polymer,2,16,60,6,24,5
+M33,Algae Biofilm,3,24,340,5,22,6
+M34,Fungal Composite Board,1,23,190,4,20,7
+M35,Chitosan Biopolymer,2,31,460,3,18,8
+M36,Natural Rubber Composite,3,14,280,2,16,9
+M37,Cellulose Acetate,1,13,390,10,14,2
+M38,Bio-Polyethylene,2,21,430,9,12,3
+M39,Green HDPE,3,29,410,8,10,4
+M40,Recycled Nylon Board,1,28,480,7,8,5
+M41,Basalt Fiber Board,2,11,495,6,6,6
+M42,Silk Fiber Composite,3,19,499,5,4,7
+M43,Lignin Polymer Sheet,1,18,320,4,2,8
+M44,Peat Fiber Board,2,26,140,3,5,8
+M45,Cork Composite Board,3,34,460,2,9,9
+M46,Natural Latex Board,1,8,210,10,13,2
+M47,Wool Fiber Panel,2,16,113,9,17,3
+M48,Reed Straw Composite,3,24,169,8,21,3
+M49,Sunflower Husk Board,1,23,132,7,25,4
+M50,Olive Pit Composite,2,31,190,6,29,5
+M51,Date Palm Fiber Board,3,14,121,5,33,6
+M52,Sisal Fiber Composite,1,13,82,4,37,7
+M53,Ramie Fiber Board,2,21,143,3,41,8
+M54,Hempcrete Panel,3,29,194,2,45,9
+M55,Bio-Glass Composite,1,28,160,10,49,2
+M56,Magnesium Alloy Pack,2,11,91,9,53,3
+M57,Tinplate Eco Steel,3,19,147,8,57,4
+M58,Recycled Copper Sheet,1,18,113,7,61,5
+M59,Graphene Bio-Composite,2,26,169,6,65,6
+M60,Hybrid Fiber Polymer,3,34,221,5,69,7
+M61,Nano-Cellulose Sheet,1,8,66,4,73,8
+M62,Bioceramic Composite,2,16,122,3,77,9
+M63,Plant Resin Polymer,3,24,178,2,81,10
+M64,Eco Carbon Fiber,1,23,495,1,85,10

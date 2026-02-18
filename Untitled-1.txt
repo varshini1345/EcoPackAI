@@ -1,0 +1,3 @@
+What happened?By using df['Cost_Index'] = (df['Strength'] * 2.0) + (df['Recyclability'] * 0.1) + (df['Weight_Capacity'] * 0.05), you gave the model a consistent mathematical signal.Eliminated Contradictions: Previously, your data had similar materials with different costs. The formula "smoothed" this out.Enabled Pattern Matching: Random Forest is excellent at finding these types of weighted relationships.Cross-Validation Success: Since your $R^2$ is now high on the test set, it means the model didn't just memorize the data—it actually learned the underlying formula.nt index, value;
+
+    getline(ss, se)
