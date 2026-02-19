@@ -2,49 +2,56 @@ import os
 import joblib
 import pandas as pd
 import numpy as np
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from sqlalchemy import create_engine
 from pathlib import Path
 from dotenv import load_dotenv
 
-# --- 1. CONFIGURATION & SECURITY ---
-load_dotenv() 
-app = Flask(__name__)
-CORS(app)  # Allows your Frontend to talk to this Backend
+# ---------------------------------------------------
+# 1️⃣ CONFIGURATION
+# ---------------------------------------------------
 
-# Get DB URL from Environment Variable (Render/Heroku)
+load_dotenv()
+
+app = Flask(__name__)
+CORS(app)
+
+# Get DB URL from environment (Render)
 DB_URI = os.getenv("DATABASE_URL")
 
-if not DB_URI:
-    # Local fallback for your machine (Development only)
-    DB_URI = "postgresql://postgres:Swathi%40123@localhost:5432/EcoPackAI"
-else:
-    # Production Fix: SQLAlchemy 1.4+ requires 'postgresql://' instead of 'postgres://'
+if DB_URI:
+    # Fix for Render postgres format
     if DB_URI.startswith("postgres://"):
         DB_URI = DB_URI.replace("postgres://", "postgresql://", 1)
+else:
+    # Local development fallback only
+    DB_URI = "postgresql://postgres:Swathi%40123@localhost:5432/EcoPackAI"
 
-# Create Database Connection
-try:
-    engine = create_engine(DB_URI)
-except Exception as e:
-    print(f"Database Connection Error: {e}")
+# Create database engine
+engine = create_engine(DB_URI)
 
-# DYNAMIC FILE PATHS (Ensures it works on Windows and Linux/Render)
+# ---------------------------------------------------
+# 2️⃣ MODEL LOADING (Dynamic & Safe)
+# ---------------------------------------------------
+
 BASE_DIR = Path(__file__).resolve().parent
 
 def load_model(filename):
     path = BASE_DIR / filename
     if not path.exists():
-        print(f"CRITICAL ERROR: {filename} not found at {path}")
+        print(f"⚠ ERROR: {filename} not found at {path}")
         return None
     return joblib.load(path)
 
-rf_model = load_model('rf_model.pkl')
-xgb_model = load_model('xgb_model.pkl')
-scaler = load_model('scaler.pkl')
+rf_model = load_model("rf_model.pkl")
+xgb_model = load_model("xgb_model.pkl")
+scaler = load_model("scaler.pkl")
 
-# --- 2. DATA FETCHING & CATEGORY RULES ---
+# ---------------------------------------------------
+# 3️⃣ DATA UTILITIES
+# ---------------------------------------------------
+
 def fetch_data():
     query = "SELECT * FROM materials"
     return pd.read_sql(query, engine)
@@ -54,6 +61,10 @@ def safe_normalize(value, series):
     if max_val == min_val:
         return 1.0
     return (value - min_val) / (max_val - min_val)
+
+# ---------------------------------------------------
+# 4️⃣ CATEGORY RULES
+# ---------------------------------------------------
 
 Category_rules = {
     "food": lambda df: df[df["biodegradability_score"] >= 8],
@@ -73,45 +84,54 @@ Category_rules = {
     "office_supplies": lambda df: df[df["recyclability"] >= 90]
 }
 
-# --- 3. ROUTES ---
-@app.route("/", methods=['GET'])
-def health_check():
+# ---------------------------------------------------
+# 5️⃣ ROUTES
+# ---------------------------------------------------
+
+# 🔹 Render Frontend
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+# 🔹 Health Check
+@app.route("/health")
+def health():
     return jsonify({
-        "message": "EcoPackAI API is working fine!", 
-        "status": "online",
-        "database_connected": DB_URI is not None
+        "message": "EcoPackAI API is working fine!",
+        "status": "online"
     })
 
-@app.route("/recommend", methods=['POST'])
+# 🔹 Recommendation Engine
+@app.route("/recommend", methods=["POST"])
 def recommend():
     try:
         data = request.get_json()
         required_fields = ["product_category", "fragility", "Shipping_Type", "Sustainability_Priority"]
-        
+
         if not data or not all(field in data for field in required_fields):
             return jsonify({"error": "Missing required fields"}), 400
 
-        # Load data from DB
         materials_df = fetch_data()
-        if materials_df.empty:
-            return jsonify({"error": "No materials data available in database"}), 500
 
-        # Filtering Logic
+        if materials_df.empty:
+            return jsonify({"error": "No materials data available"}), 500
+
+        # ---------------- FILTERING ----------------
         product_category = data["product_category"]
         if product_category in Category_rules:
-            filtered_df = Category_rules[product_category](materials_df)
-            # Fallback if category filter is too strict
-            materials_df = filtered_df if not filtered_df.empty else materials_df
-        
-        # Fragility Logic
+            filtered = Category_rules[product_category](materials_df)
+            if not filtered.empty:
+                materials_df = filtered
+
         fragility = data.get("fragility", "medium").lower()
         if fragility == "high":
             materials_df = materials_df[materials_df["strength"] >= 3]
         elif fragility == "medium":
             materials_df = materials_df[materials_df["strength"] >= 2]
 
-        # Dynamic Weighting
+        # ---------------- DYNAMIC WEIGHTS ----------------
         prio = data["Sustainability_Priority"].lower()
+
         if prio == "high":
             w_cost, w_co2, w_suit = 0.20, 0.40, 0.40
         elif prio == "medium":
@@ -119,7 +139,7 @@ def recommend():
         else:
             w_cost, w_co2, w_suit = 0.40, 0.30, 0.30
 
-        # --- FEATURE MAPPING FOR ML MODEL ---
+        # ---------------- ML FEATURE PREP ----------------
         rename_map = {
             "strength": "Strength",
             "weight_capacity": "Weight_Capacity",
@@ -127,60 +147,62 @@ def recommend():
             "biodegradability_score": "Biodegradability_Score",
             "recyclability": "Recyclability"
         }
-        
-        feature_order = ["Strength", "Weight_Capacity", "Cost_Per_Unit_INR", "Biodegradability_Score", "Recyclability"]
-        
-        # Prepare input for ML
+
+        feature_order = ["Strength", "Weight_Capacity", "Cost_Per_Unit_INR",
+                         "Biodegradability_Score", "Recyclability"]
+
         X_input = materials_df[list(rename_map.keys())].rename(columns=rename_map)
         X_input = X_input[feature_order]
 
-        # ML Predictions (Scaling + XGBoost)
+        # ---------------- ML PREDICTION ----------------
         if scaler and xgb_model:
             X_scaled = scaler.transform(X_input)
             xgb_preds = xgb_model.predict(X_scaled)
         else:
-            # Fallback if models failed to load
-            xgb_preds = materials_df["co2_emission_score"].values 
+            xgb_preds = materials_df["co2_emission_score"].values
 
         predictions = []
-        for i, (idx, row) in enumerate(materials_df.iterrows()):
-            # Clip negative CO2 values to zero (Task 4 requirement)
-            pred_co2 = max(0.0, float(xgb_preds[i]))
 
-            # Normalization for Scoring
+        for i, (idx, row) in enumerate(materials_df.iterrows()):
+            pred_co2 = max(0.0, float(xgb_preds[i]))  # No negative CO2
+
             s_norm = safe_normalize(row["strength"], materials_df["strength"])
             r_norm = safe_normalize(row["recyclability"], materials_df["recyclability"])
             b_norm = safe_normalize(row["biodegradability_score"], materials_df["biodegradability_score"])
             cost_norm = safe_normalize(row["cost_per_unit"], materials_df["cost_per_unit"])
             co2_norm = safe_normalize(row["co2_emission_score"], materials_df["co2_emission_score"])
 
-            suitability_score = (0.4 * s_norm) + (0.3 * r_norm) + (0.3 * b_norm)
-            
+            suitability = (0.4 * s_norm) + (0.3 * r_norm) + (0.3 * b_norm)
+
             final_score = (
                 w_cost * (1 - cost_norm) +
                 w_co2 * (1 - co2_norm) +
-                w_suit * suitability_score
+                w_suit * suitability
             )
 
             predictions.append({
                 "material": row["material_type"],
                 "predicted_cost": float(row["cost_per_unit"]),
                 "predicted_co2": round(pred_co2, 2),
-                "suitability_score": round(final_score, 2)
+                "suitability_score": round(final_score, 3)
             })
 
-        # Sort and return top 5
         df_results = pd.DataFrame(predictions)
-        top_recommendations = df_results.sort_values("suitability_score", ascending=False).head(5)
+        top5 = df_results.sort_values("suitability_score", ascending=False).head(5)
 
-        return jsonify({"recommended_materials": top_recommendations.to_dict(orient="records")})
+        return jsonify({
+            "recommended_materials": top5.to_dict(orient="records")
+        })
 
     except Exception as e:
         print(f"Error in /recommend: {e}")
         return jsonify({"error": "Internal Server Error", "details": str(e)}), 500
 
+
+# ---------------------------------------------------
+# 6️⃣ RUN APP
+# ---------------------------------------------------
+
 if __name__ == "__main__":
-    # Render provides a PORT environment variable
     port = int(os.environ.get("PORT", 5000))
-    # Debug must be False for production (Task 4)
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=False)
