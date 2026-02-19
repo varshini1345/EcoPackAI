@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", function () {
   let chartTrendsLine = null;
 
   // ✅ FIXED BACKEND URL (LOCAL FLASK)
-  const API_URL = "http://127.0.0.1:5000";
+const API_URL = "https://ecopackai-cdvs.onrender.com"
 
   const form = document.getElementById("productForm");
   const resultsSection = document.getElementById("results-section");
