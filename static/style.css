@@ -1,0 +1,233 @@
+:root {
+  --primary:    #26a69a;     /* Teal - main accent */
+  --primary-dark:#00897b;
+  --secondary:  #ab47bc;     /* Purple accent */
+  --success:    #66bb6a;     /* Softer green for eco */
+  --warning:    #ffa726;     /* Amber/orange for savings */
+  --info:       #42a5f5;     /* Soft blue */
+  --light:      #f8fafc;
+  --gray:       #64748b;
+  --dark:       #1e293b;
+  --danger:     #ef4444;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--light);
+  color: var(--dark);
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 2.5rem auto;
+  padding: 0 1.5rem;
+}
+
+h1, h2, h3 {
+  color: var(--dark);
+  text-align: center;
+  margin-bottom: 1.8rem;
+}
+
+h1 {
+  font-size: 2.6rem;
+  color: var(--primary);
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+  padding: 2rem;
+  margin-bottom: 2.5rem;
+  border: 1px solid rgba(38,166,154,0.08);
+}
+
+.form-group {
+  margin-bottom: 1.6rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.7rem;
+  font-weight: 600;
+  color: var(--dark);
+}
+
+select, input[type="number"] {
+  width: 100%;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+select:focus, input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(38,166,154,0.15);
+}
+
+.radio-group {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+}
+
+.radio-group label {
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  cursor: pointer;
+  color: var(--dark);
+}
+
+button {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  border: none;
+  padding: 1rem 2.4rem;
+  font-size: 1.1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s;
+  font-weight: 600;
+}
+
+button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(38,166,154,0.3);
+}
+
+button:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.95rem;
+  margin-top: 0.5rem;
+  display: none;
+}
+
+#results-section, #dashboard-section {
+  display: none;
+}
+
+.loading {
+  text-align: center;
+  font-size: 1.4rem;
+  color: var(--gray);
+  padding: 4rem 0;
+  display: none;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1.2rem;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+
+th, td {
+  padding: 1.1rem 1.3rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+th {
+  background: var(--primary);
+  color: white;
+}
+
+.rank {
+  text-align: center;
+  font-weight: bold;
+  background: #ecfdf5;
+  color: var(--primary-dark);
+  width: 90px;
+}
+
+tr:hover {
+  background: #f0fdfa;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.8rem;
+  margin: 2.5rem 0;
+}
+
+.metric-card {
+  background: white;
+  border-radius: 14px;
+  padding: 1.8rem;
+  text-align: center;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.07);
+  border-left: 5px solid var(--primary);
+}
+
+.metric-value {
+  font-size: 2.6rem;
+  font-weight: 700;
+  margin: 0.6rem 0;
+}
+
+.metric-label {
+  color: var(--gray);
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 2.2rem;
+  margin-top: 2.5rem;
+}
+
+.chart-container {
+  height: 340px;
+  background: white;
+  border-radius: 14px;
+  padding: 1.2rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+}
+
+.export-buttons {
+  text-align: center;
+  margin: 2.5rem 0;
+  display: flex;
+  gap: 1.8rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.export-buttons button {
+  background: var(--secondary);
+}
+
+.export-buttons button:hover {
+  background: #7e57c2;
+  box-shadow: 0 8px 20px rgba(171,71,188,0.3);
+}
+
+@media (max-width: 768px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+  h1 {
+    font-size: 2.1rem;
+  }
+}

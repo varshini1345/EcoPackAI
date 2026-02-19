@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EcoPackAI - Sustainable Packaging & BI Dashboard</title>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Link to external CSS -->
+ <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+<body>
+
+<div class="container">
+  <h1>EcoPackAI – Smart & Sustainable Packaging</h1>
+
+  <!-- Form -->
+  <div class="card">
+    <form id="productForm">
+      <div class="form-group">
+        <label for="product_category">Product Category *</label>
+        <select id="product_category" required>
+          <option value="">-- Select Category --</option>
+          <option value="food">Food</option>
+          <option value="beverages">Beverages</option>
+          <option value="pharmaceuticals">Pharmaceuticals</option>
+          <option value="agriculture">Agriculture</option>
+          <option value="electronics">Electronics</option>
+          <option value="automotive_parts">Automotive Parts</option>
+          <option value="construction_tools">Construction Tools</option>
+          <option value="industrial_chemicals">Industrial Chemicals</option>
+          <option value="cosmetics">Cosmetics</option>
+          <option value="apparel_fashion">Apparel & Fashion</option>
+          <option value="luxury_goods">Luxury Goods</option>
+          <option value="e_commerce_general">E-commerce General</option>
+          <option value="home_appliances">Home Appliances</option>
+          <option value="toys_baby_products">Toys & Baby Products</option>
+          <option value="office_supplies">Office Supplies</option>
+        </select>
+        <div class="error" id="err_category">Please select a category</div>
+      </div>
+
+      <div class="form-group">
+        <label>Fragility Level *</label>
+        <div class="radio-group">
+          <label><input type="radio" name="fragility" value="low" required> Low</label>
+          <label><input type="radio" name="fragility" value="medium"> Medium</label>
+          <label><input type="radio" name="fragility" value="high"> High</label>
+        </div>
+        <div class="error" id="err_fragility">Please select fragility level</div>
+      </div>
+
+      <div class="form-group">
+        <label for="weight">Approximate Weight (kg) *</label>
+        <input type="number" id="weight" min="0.01" step="0.01" required placeholder="e.g. 2.5">
+        <div class="error" id="err_weight">Please enter a valid weight</div>
+      </div>
+
+      <div class="form-group">
+        <label>Shipping Type *</label>
+        <div class="radio-group">
+          <label><input type="radio" name="Shipping_Type" value="domestic" required> Domestic</label>
+          <label><input type="radio" name="Shipping_Type" value="international"> International</label>
+        </div>
+        <div class="error" id="err_shipping">Please select shipping type</div>
+      </div>
+
+      <div class="form-group">
+        <label>Sustainability Priority *</label>
+        <div class="radio-group">
+          <label><input type="radio" name="Sustainability_Priority" value="high" required> High</label>
+          <label><input type="radio" name="Sustainability_Priority" value="medium"> Medium</label>
+          <label><input type="radio" name="Sustainability_Priority" value="low"> Low</label>
+        </div>
+        <div class="error" id="err_priority">Please select priority</div>
+      </div>
+
+      <div style="text-align:center; margin-top:3rem;">
+        <button type="submit" id="submitBtn">Get Recommendations</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Results + Export -->
+  <div class="card" id="results-section">
+    <h2>Your Recommended Materials</h2>
+    <div class="loading" id="loading">Finding the best eco-packaging options...</div>
+    <div id="resultsTable"></div>
+
+    <div class="export-buttons">
+      <button onclick="exportToCSV()">Export Ranking to Excel/CSV</button>
+      <button onclick="exportToPDF()">Export Summary Report (Print/PDF)</button>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="card" id="dashboard-section">
+    <h2>Packaging Insights Dashboard</h2>
+
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Average CO₂ Reduction</div>
+        <div class="metric-value" id="co2Reduction" style="color: var(--success);">— %</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Estimated Cost Savings</div>
+        <div class="metric-value" id="costSavings" style="color: var(--warning);">₹ —</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Total Recommendations</div>
+        <div class="metric-value" id="totalRecs" style="color: var(--info);">0</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-container">
+        <canvas id="materialUsageBar"></canvas>
+      </div>
+      <div class="chart-container">
+        <canvas id="materialPie"></canvas>
+      </div>
+      <div class="chart-container">
+        <canvas id="rankingHorizontalBar"></canvas>
+      </div>
+      <div class="chart-container">
+        <canvas id="trendsLine"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Link to external JavaScript -->
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
