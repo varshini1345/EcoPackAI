@@ -1,4 +1,4 @@
-Material_ID,Material_Type,Strength,Weight_Capacity,Cost_Per_Unit_INR,Biodegradability_Score,Recyclability,CO2_Score
+material_type,strength,weight_capacity,cost_per_unit,biodegradability_score,co2_emission_score,recyclability
 M01,Hemp Fiber Board,1,8,280,10,88,2
 M02,Seaweed Packaging,2,16,120,9,85,2
 M03,Mycelium Foam,3,24,150,8,82,3

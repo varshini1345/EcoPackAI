@@ -17,22 +17,18 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Get DB URL from environment (Render)
 DB_URI = os.getenv("DATABASE_URL")
 
 if DB_URI:
-    # Fix for Render postgres format
     if DB_URI.startswith("postgres://"):
         DB_URI = DB_URI.replace("postgres://", "postgresql://", 1)
 else:
-    # Local development fallback only
     DB_URI = "postgresql://postgres:Swathi%40123@localhost:5432/EcoPackAI"
 
-# Create database engine
 engine = create_engine(DB_URI)
 
 # ---------------------------------------------------
-# 2️⃣ MODEL LOADING (Dynamic & Safe)
+# 2️⃣ MODEL LOADING
 # ---------------------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -57,9 +53,10 @@ def fetch_data():
     return pd.read_sql(query, engine)
 
 def safe_normalize(value, series):
-    min_val, max_val = series.min(), series.max()
+    min_val = series.min()
+    max_val = series.max()
     if max_val == min_val:
-        return 1.0
+        return 0.5
     return (value - min_val) / (max_val - min_val)
 
 # ---------------------------------------------------
@@ -88,20 +85,17 @@ Category_rules = {
 # 5️⃣ ROUTES
 # ---------------------------------------------------
 
-# 🔹 Render Frontend
 @app.route("/")
 def home():
     return render_template("index.html")
 
-# 🔹 Health Check
 @app.route("/health")
 def health():
     return jsonify({
-        "message": "EcoPackAI API is working fine!",
-        "status": "online"
+        "status": "online",
+        "message": "EcoPackAI API is working fine!"
     })
 
-# 🔹 Recommendation Engine
 @app.route("/recommend", methods=["POST"])
 def recommend():
     try:
@@ -111,35 +105,48 @@ def recommend():
         if not data or not all(field in data for field in required_fields):
             return jsonify({"error": "Missing required fields"}), 400
 
-        materials_df = fetch_data()
+        full_df = fetch_data()
 
-        if materials_df.empty:
+        if full_df.empty:
             return jsonify({"error": "No materials data available"}), 500
 
-        # ---------------- FILTERING ----------------
-        product_category = data["product_category"]
+        # ---------------- CATEGORY FILTER (STRICT)
+        product_category = data["product_category"].lower()
+
         if product_category in Category_rules:
-            filtered = Category_rules[product_category](materials_df)
-            if not filtered.empty:
-                materials_df = filtered
+            materials_df = Category_rules[product_category](full_df)
+        else:
+            materials_df = full_df.copy()
 
+        if materials_df.empty:
+            return jsonify({"error": "No materials match selected category"}), 400
+
+        # ---------------- FRAGILITY FILTER
         fragility = data.get("fragility", "medium").lower()
-        if fragility == "high":
-            materials_df = materials_df[materials_df["strength"] >= 3]
-        elif fragility == "medium":
-            materials_df = materials_df[materials_df["strength"] >= 2]
 
-        # ---------------- DYNAMIC WEIGHTS ----------------
+        if fragility == "high":
+            strength_boost = 0.2
+            materials_df = materials_df[materials_df["strength"] >= 4]
+        elif fragility == "medium":
+            strength_boost = 0.1
+            materials_df = materials_df[materials_df["strength"] >= 2]
+        else:
+            strength_boost = 0.0
+
+        if materials_df.empty:
+            return jsonify({"error": "No materials after fragility filter"}), 400
+
+        # ---------------- PRIORITY WEIGHTS
         prio = data["Sustainability_Priority"].lower()
 
         if prio == "high":
-            w_cost, w_co2, w_suit = 0.20, 0.40, 0.40
+            w_cost, w_co2, w_suit = 0.10, 0.55, 0.35
         elif prio == "medium":
-            w_cost, w_co2, w_suit = 0.30, 0.35, 0.35
+            w_cost, w_co2, w_suit = 0.30, 0.40, 0.30
         else:
-            w_cost, w_co2, w_suit = 0.40, 0.30, 0.30
+            w_cost, w_co2, w_suit = 0.60, 0.25, 0.15
 
-        # ---------------- ML FEATURE PREP ----------------
+        # ---------------- ML FEATURE PREP
         rename_map = {
             "strength": "Strength",
             "weight_capacity": "Weight_Capacity",
@@ -148,31 +155,41 @@ def recommend():
             "recyclability": "Recyclability"
         }
 
-        feature_order = ["Strength", "Weight_Capacity", "Cost_Per_Unit_INR",
-                         "Biodegradability_Score", "Recyclability"]
+        feature_order = [
+            "Strength",
+            "Weight_Capacity",
+            "Cost_Per_Unit_INR",
+            "Biodegradability_Score",
+            "Recyclability"
+        ]
 
         X_input = materials_df[list(rename_map.keys())].rename(columns=rename_map)
         X_input = X_input[feature_order]
 
-        # ---------------- ML PREDICTION ----------------
+        # ---------------- ML CO2 PREDICTION
         if scaler and xgb_model:
             X_scaled = scaler.transform(X_input)
             xgb_preds = xgb_model.predict(X_scaled)
         else:
             xgb_preds = materials_df["co2_emission_score"].values
 
-        predictions = []
+        results = []
 
         for i, (idx, row) in enumerate(materials_df.iterrows()):
-            pred_co2 = max(0.0, float(xgb_preds[i]))  # No negative CO2
 
-            s_norm = safe_normalize(row["strength"], materials_df["strength"])
-            r_norm = safe_normalize(row["recyclability"], materials_df["recyclability"])
-            b_norm = safe_normalize(row["biodegradability_score"], materials_df["biodegradability_score"])
-            cost_norm = safe_normalize(row["cost_per_unit"], materials_df["cost_per_unit"])
-            co2_norm = safe_normalize(row["co2_emission_score"], materials_df["co2_emission_score"])
+            s_norm = safe_normalize(row["strength"], full_df["strength"])
+            r_norm = safe_normalize(row["recyclability"], full_df["recyclability"])
+            b_norm = safe_normalize(row["biodegradability_score"], full_df["biodegradability_score"])
+            cost_norm = safe_normalize(row["cost_per_unit"], full_df["cost_per_unit"])
 
-            suitability = (0.4 * s_norm) + (0.3 * r_norm) + (0.3 * b_norm)
+            pred_co2 = max(0.0, float(xgb_preds[i]))
+            co2_norm = safe_normalize(pred_co2, full_df["co2_emission_score"])
+
+            suitability = (
+                (0.4 + strength_boost) * s_norm +
+                0.3 * r_norm +
+                0.3 * b_norm
+            )
 
             final_score = (
                 w_cost * (1 - cost_norm) +
@@ -180,14 +197,14 @@ def recommend():
                 w_suit * suitability
             )
 
-            predictions.append({
+            results.append({
                 "material": row["material_type"],
-                "predicted_cost": float(row["cost_per_unit"]),
+                "predicted_cost": round(float(row["cost_per_unit"]), 2),
                 "predicted_co2": round(pred_co2, 2),
-                "suitability_score": round(final_score, 3)
+                "suitability_score": round(final_score * 100, 2)
             })
 
-        df_results = pd.DataFrame(predictions)
+        df_results = pd.DataFrame(results)
         top5 = df_results.sort_values("suitability_score", ascending=False).head(5)
 
         return jsonify({
@@ -195,12 +212,12 @@ def recommend():
         })
 
     except Exception as e:
-        print(f"Error in /recommend: {e}")
+        print("Error in /recommend:", e)
         return jsonify({"error": "Internal Server Error", "details": str(e)}), 500
 
 
 # ---------------------------------------------------
-# 6️⃣ RUN APP
+# 6️⃣ RUN
 # ---------------------------------------------------
 
 if __name__ == "__main__":
