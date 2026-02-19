@@ -11,9 +11,6 @@ document.addEventListener("DOMContentLoaded", function () {
   let chartRankingBar = null;
   let chartTrendsLine = null;
 
-  // ✅ FIXED BACKEND URL (LOCAL FLASK)
-const API_URL = "https://ecopackai-cdvs.onrender.com"
-
   const form = document.getElementById("productForm");
   const resultsSection = document.getElementById("results-section");
   const dashboardSection = document.getElementById("dashboard-section");
@@ -55,17 +52,19 @@ const API_URL = "https://ecopackai-cdvs.onrender.com"
     if (submitBtn) submitBtn.disabled = true;
 
     try {
-      const response = await fetch(`${API_URL}/recommend`, {
+
+      const response = await fetch("/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
-
       const data = await response.json();
+
+      // ✅ Improved production-safe error handling
+      if (!response.ok || data.error) {
+        throw new Error(data.error || `Server error: ${response.status}`);
+      }
 
       const recommendations = (data.recommended_materials || []).sort(
         (a, b) => Number(b.suitability_score) - Number(a.suitability_score)
@@ -85,9 +84,9 @@ const API_URL = "https://ecopackai-cdvs.onrender.com"
       if (dashboardSection) dashboardSection.style.display = "block";
 
     } catch (err) {
-      console.error("Fetch Error:", err);
+      console.error("Fetch Error:", err.message);
       resultsTableDiv.innerHTML =
-        '<p style="color:red;text-align:center;">Server connection failed. Please try again.</p>';
+        `<p style="color:red;text-align:center;">${err.message}</p>`;
     } finally {
       if (loading) loading.style.display = "none";
       if (submitBtn) submitBtn.disabled = false;
@@ -161,13 +160,10 @@ const API_URL = "https://ecopackai-cdvs.onrender.com"
 
     let costDifference = baselineCost - avgCost;
 
-    if (costDifference >= 0) {
-      document.getElementById("costSavings").textContent =
-        `₹ ${costDifference.toFixed(0)} Saved`;
-    } else {
-      document.getElementById("costSavings").textContent =
-        `₹ ${Math.abs(costDifference).toFixed(0)} Higher`;
-    }
+    document.getElementById("costSavings").textContent =
+      costDifference >= 0
+        ? `₹ ${costDifference.toFixed(0)} Saved`
+        : `₹ ${Math.abs(costDifference).toFixed(0)} Higher`;
 
     document.getElementById("totalRecs").textContent =
       allRecommendations.length;
@@ -225,7 +221,7 @@ const API_URL = "https://ecopackai-cdvs.onrender.com"
     });
   }
 
-  // ---------------- EXPORT TO CSV ----------------
+  // ---------------- EXPORT CSV ----------------
   window.exportToCSV = function () {
 
     if (!allRecommendations.length) {
@@ -250,7 +246,7 @@ const API_URL = "https://ecopackai-cdvs.onrender.com"
     URL.revokeObjectURL(url);
   };
 
-  // ---------------- EXPORT TO PDF ----------------
+  // ---------------- EXPORT PDF ----------------
   window.exportToPDF = function () {
 
     if (!allRecommendations.length) {

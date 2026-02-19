@@ -1,7 +1,6 @@
 import os
 import joblib
 import pandas as pd
-import numpy as np
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from sqlalchemy import create_engine
@@ -17,18 +16,23 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+# ---------------------------------------------------
+# 2️⃣ DATABASE CONFIG (PRODUCTION SAFE)
+# ---------------------------------------------------
+
 DB_URI = os.getenv("DATABASE_URL")
 
-if DB_URI:
-    if DB_URI.startswith("postgres://"):
-        DB_URI = DB_URI.replace("postgres://", "postgresql://", 1)
-else:
-    DB_URI = "postgresql://postgres:Swathi%40123@localhost:5432/EcoPackAI"
+if not DB_URI:
+    raise Exception("DATABASE_URL environment variable not set")
+
+# Fix Render postgres:// issue
+if DB_URI.startswith("postgres://"):
+    DB_URI = DB_URI.replace("postgres://", "postgresql://", 1)
 
 engine = create_engine(DB_URI)
 
 # ---------------------------------------------------
-# 2️⃣ MODEL LOADING
+# 3️⃣ MODEL LOADING
 # ---------------------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -36,7 +40,7 @@ BASE_DIR = Path(__file__).resolve().parent
 def load_model(filename):
     path = BASE_DIR / filename
     if not path.exists():
-        print(f"⚠ ERROR: {filename} not found at {path}")
+        print(f"⚠ {filename} not found")
         return None
     return joblib.load(path)
 
@@ -45,22 +49,19 @@ xgb_model = load_model("xgb_model.pkl")
 scaler = load_model("scaler.pkl")
 
 # ---------------------------------------------------
-# 3️⃣ DATA UTILITIES
+# 4️⃣ DATA UTILITIES
 # ---------------------------------------------------
 
 def fetch_data():
-    query = "SELECT * FROM materials"
-    return pd.read_sql(query, engine)
+    return pd.read_sql("SELECT * FROM materials", engine)
 
-def safe_normalize(value, series):
-    min_val = series.min()
-    max_val = series.max()
+def safe_normalize(value, min_val, max_val):
     if max_val == min_val:
         return 0.5
     return (value - min_val) / (max_val - min_val)
 
 # ---------------------------------------------------
-# 4️⃣ CATEGORY RULES
+# 5️⃣ CATEGORY RULES
 # ---------------------------------------------------
 
 Category_rules = {
@@ -82,7 +83,7 @@ Category_rules = {
 }
 
 # ---------------------------------------------------
-# 5️⃣ ROUTES
+# 6️⃣ ROUTES
 # ---------------------------------------------------
 
 @app.route("/")
@@ -91,101 +92,110 @@ def home():
 
 @app.route("/health")
 def health():
-    return jsonify({
-        "status": "online",
-        "message": "EcoPackAI API is working fine!"
-    })
+    return jsonify({"status": "online"})
 
 @app.route("/recommend", methods=["POST"])
 def recommend():
     try:
-        data = request.get_json()
-        required_fields = ["product_category", "fragility", "Shipping_Type", "Sustainability_Priority"]
+        data = request.get_json(force=True)
 
-        if not data or not all(field in data for field in required_fields):
+        required_fields = [
+            "product_category",
+            "fragility",
+            "Shipping_Type",
+            "Sustainability_Priority"
+        ]
+
+        if not all(field in data for field in required_fields):
             return jsonify({"error": "Missing required fields"}), 400
 
         full_df = fetch_data()
 
         if full_df.empty:
-            return jsonify({"error": "No materials data available"}), 500
+            return jsonify({"error": "No materials available"}), 500
 
-        # ---------------- CATEGORY FILTER (STRICT)
-        product_category = data["product_category"].lower()
+        # ---------------- CATEGORY FILTER
+        category = data["product_category"].lower()
 
-        if product_category in Category_rules:
-            materials_df = Category_rules[product_category](full_df)
+        if category in Category_rules:
+            filtered = Category_rules[category](full_df)
+            materials_df = filtered if not filtered.empty else full_df.copy()
         else:
             materials_df = full_df.copy()
 
-        if materials_df.empty:
-            return jsonify({"error": "No materials match selected category"}), 400
-
         # ---------------- FRAGILITY FILTER
-        fragility = data.get("fragility", "medium").lower()
+        fragility = data["fragility"].lower()
 
         if fragility == "high":
             strength_boost = 0.2
-            materials_df = materials_df[materials_df["strength"] >= 4]
+            temp = materials_df[materials_df["strength"] >= 4]
         elif fragility == "medium":
             strength_boost = 0.1
-            materials_df = materials_df[materials_df["strength"] >= 2]
+            temp = materials_df[materials_df["strength"] >= 2]
         else:
             strength_boost = 0.0
+            temp = materials_df
 
-        if materials_df.empty:
-            return jsonify({"error": "No materials after fragility filter"}), 400
+        if not temp.empty:
+            materials_df = temp
+
+        # ---------------- SHIPPING FILTER
+        shipping = data["Shipping_Type"].lower()
+
+        if shipping == "international":
+            temp = materials_df[materials_df["strength"] >= 3]
+            if not temp.empty:
+                materials_df = temp
 
         # ---------------- PRIORITY WEIGHTS
-        prio = data["Sustainability_Priority"].lower()
+        priority = data["Sustainability_Priority"].lower()
 
-        if prio == "high":
+        if priority == "high":
             w_cost, w_co2, w_suit = 0.10, 0.55, 0.35
-        elif prio == "medium":
+        elif priority == "medium":
             w_cost, w_co2, w_suit = 0.30, 0.40, 0.30
         else:
             w_cost, w_co2, w_suit = 0.60, 0.25, 0.15
 
-        # ---------------- ML FEATURE PREP
-        rename_map = {
-            "strength": "Strength",
-            "weight_capacity": "Weight_Capacity",
-            "cost_per_unit": "Cost_Per_Unit_INR",
-            "biodegradability_score": "Biodegradability_Score",
-            "recyclability": "Recyclability"
-        }
-
-        feature_order = [
-            "Strength",
-            "Weight_Capacity",
-            "Cost_Per_Unit_INR",
-            "Biodegradability_Score",
-            "Recyclability"
-        ]
-
-        X_input = materials_df[list(rename_map.keys())].rename(columns=rename_map)
-        X_input = X_input[feature_order]
-
         # ---------------- ML CO2 PREDICTION
         if scaler and xgb_model:
+            rename_map = {
+                "strength": "Strength",
+                "weight_capacity": "Weight_Capacity",
+                "cost_per_unit": "Cost_Per_Unit_INR",
+                "biodegradability_score": "Biodegradability_Score",
+                "recyclability": "Recyclability"
+            }
+
+            feature_order = list(rename_map.values())
+
+            X_input = materials_df[list(rename_map.keys())].rename(columns=rename_map)
+            X_input = X_input[feature_order]
             X_scaled = scaler.transform(X_input)
-            xgb_preds = xgb_model.predict(X_scaled)
+            co2_preds = xgb_model.predict(X_scaled)
         else:
-            xgb_preds = materials_df["co2_emission_score"].values
+            co2_preds = materials_df["co2_emission_score"].values
+
+        # ---------------- NORMALIZATION RANGES
+        min_cost = full_df["cost_per_unit"].min()
+        max_cost = full_df["cost_per_unit"].max()
+        min_co2 = max(0.0, full_df["co2_emission_score"].min())
+        max_co2 = full_df["co2_emission_score"].max()
 
         results = []
 
-        for i, (idx, row) in enumerate(materials_df.iterrows()):
+        for i, (_, row) in enumerate(materials_df.iterrows()):
 
-            s_norm = safe_normalize(row["strength"], full_df["strength"])
-            r_norm = safe_normalize(row["recyclability"], full_df["recyclability"])
-            b_norm = safe_normalize(row["biodegradability_score"], full_df["biodegradability_score"])
-            cost_norm = safe_normalize(row["cost_per_unit"], full_df["cost_per_unit"])
+            cost = max(0.0, float(row["cost_per_unit"]))
+            pred_co2 = max(0.0, float(co2_preds[i]))  # NEVER NEGATIVE
 
-            pred_co2 = max(0.0, float(xgb_preds[i]))
-            co2_norm = safe_normalize(pred_co2, full_df["co2_emission_score"])
+            s_norm = safe_normalize(row["strength"], full_df["strength"].min(), full_df["strength"].max())
+            r_norm = safe_normalize(row["recyclability"], full_df["recyclability"].min(), full_df["recyclability"].max())
+            b_norm = safe_normalize(row["biodegradability_score"], full_df["biodegradability_score"].min(), full_df["biodegradability_score"].max())
+            cost_norm = safe_normalize(cost, min_cost, max_cost)
+            co2_norm = safe_normalize(pred_co2, min_co2, max_co2)
 
-            suitability = (
+            sustainability = (
                 (0.4 + strength_boost) * s_norm +
                 0.3 * r_norm +
                 0.3 * b_norm
@@ -194,12 +204,14 @@ def recommend():
             final_score = (
                 w_cost * (1 - cost_norm) +
                 w_co2 * (1 - co2_norm) +
-                w_suit * suitability
+                w_suit * sustainability
             )
+
+            final_score = max(0.0, final_score)
 
             results.append({
                 "material": row["material_type"],
-                "predicted_cost": round(float(row["cost_per_unit"]), 2),
+                "predicted_cost": round(cost, 2),
                 "predicted_co2": round(pred_co2, 2),
                 "suitability_score": round(final_score * 100, 2)
             })
@@ -212,14 +224,14 @@ def recommend():
         })
 
     except Exception as e:
-        print("Error in /recommend:", e)
-        return jsonify({"error": "Internal Server Error", "details": str(e)}), 500
+        print("ERROR:", str(e))
+        return jsonify({"error": "Internal Server Error"}), 500
 
 
 # ---------------------------------------------------
-# 6️⃣ RUN
+# 7️⃣ ENTRY POINT (FOR RENDER)
 # ---------------------------------------------------
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port)
